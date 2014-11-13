@@ -18,7 +18,7 @@
 #define UNRECOGNISED_SHORT  "Unrecognised option '-%c'."
 #define UNEXPECTED_ARGUMENT "Option '--%s' expects no argument."
 
-static int str_equal(char *a, char *b)
+static int str_equal(const char *a, const char *b)
 {
   if (!a || !b) return 0;
   while (*a && *b && *a == *b) {++a; ++b;}
@@ -67,13 +67,27 @@ static char *find_and_null_eq(char *s)
 #define HAS_DEFAULT(o) ((o)->type & OPTION_DEFAULT)
 #define HAS_CALLBACK(o) ((o)->type & OPTION_CALLBACK)
 
-static void apply_option(option_t *o, char *arg)
+static void apply_option(option_t *o, char *arg, int l)
 {
+  char s[2] = {0};
   if (!arg && HAS_DEFAULT(o)) {
     arg = o->arg_default;
   }
+  if (!arg && HAS_PARAMETER(o) && !HAS_DEFAULT(o)) {
+    if (l) {
+      fprintf(stderr, NEED_ARGUMENT_LONG "\n", o->longopt);
+    } else {
+      fprintf(stderr, NEED_ARGUMENT_SHORT "\n", o->shortopt);
+    }
+    exit(1);
+  }
   if (HAS_CALLBACK(o)) {
-    o->callback(arg);
+    if (l) {
+      o->callback(o->longopt, arg, 1);
+    } else {
+      s[0] = o->shortopt;
+      o->callback(s, arg, 0);
+    }
   } else if (HAS_PARAMETER(o)) {
     if (o->arg_adr) {
       *(o->arg_adr) = arg;
@@ -92,22 +106,13 @@ int parse_options(int *argc, char ***argv, option_t **options)
   char *a, *v;
   char **_argv = *argv;
   option_t *o = 0;
-  int s_l = 0;
+  int l = 0;
 
   while (i < *argc) {
     if (_argv[i][0] == '-' && _argv[i][1]) {
       if (o) {
-        if (HAS_DEFAULT(o)) {
-          apply_option(o, 0);
-          o = 0;
-        } else {
-          if (s_l) {
-            fprintf(stderr, NEED_ARGUMENT_LONG "\n", o->longopt);
-          } else {
-            fprintf(stderr, NEED_ARGUMENT_SHORT "\n", o->shortopt);
-          }
-          exit(1);
-        }
+        apply_option(o, 0, l);
+        o = 0;
       }
       if (_argv[i][1] == '-' && !_argv[i][2]) {
         /* End of options */
@@ -119,7 +124,7 @@ int parse_options(int *argc, char ***argv, option_t **options)
         }
       } else if (_argv[i][1] == '-') {
         /* Longopt */
-        s_l = 1;
+        l = 1;
         a = _argv[i] + 2;
         v = find_and_null_eq(a);
         o = lookup_long(options, a);
@@ -128,21 +133,21 @@ int parse_options(int *argc, char ***argv, option_t **options)
             fprintf(stderr, UNEXPECTED_ARGUMENT "\n", o->longopt);
             exit(1);
           }
-          apply_option(o, v);
+          apply_option(o, v, l);
           o = 0;
         }
       } else {
         /* Shortopt */
-        s_l = 0;
+        l = 0;
         j = 1;
         while ((x = _argv[i][j])) {
           o = lookup_short(options, x);
           if (!HAS_PARAMETER(o)) {
-            apply_option(o, 0);
+            apply_option(o, 0, l);
             o = 0;
           } else {
             if (_argv[i][j + 1]) {
-              apply_option(o, _argv[i] + j + 1);
+              apply_option(o, _argv[i] + j + 1, l);
               o = 0;
             }
             break;
@@ -152,7 +157,7 @@ int parse_options(int *argc, char ***argv, option_t **options)
       }
     } else {
       if (o) {
-        apply_option(o, _argv[i]);
+        apply_option(o, _argv[i], l);
         o = 0;
       } else {
         _argv[c] = _argv[i];
@@ -161,21 +166,11 @@ int parse_options(int *argc, char ***argv, option_t **options)
     }
     ++i;
   }
-  if (o) {
-    if (HAS_DEFAULT(o)) {
-      apply_option(o, 0);
-      o = 0;
-    } else {
-      if (s_l) {
-        fprintf(stderr, NEED_ARGUMENT_LONG "\n", o->longopt);
-      } else {
-        fprintf(stderr, NEED_ARGUMENT_SHORT "\n", o->shortopt);
-      }
-      exit(1);
-    }
-  }
+  if (o) apply_option(o, 0, l);
 
-  _argv[c] = 0;
+  /* Clean argument vector. */
+  for (i = c; i < *argc; ++i)
+    _argv[i] = 0;
   *argc = c;
 
   return 0;

@@ -6,14 +6,14 @@
 #define ON(x) ((x) ? "on" : "off")
 
 static const char *program = "test";
-static void help(char *arg)
+static void help(const char *opt, const char *arg, int l)
 {
   printf("Usage: %s [-adhv] [-i input-file] [-l log-level] ...\n", program);
   exit(1);
 }
 
 static int verbosity = 0;
-static void verbose(char *arg)
+static void verbose(const char *opt, const char *arg, int l)
 {
   verbosity += 1;
 }

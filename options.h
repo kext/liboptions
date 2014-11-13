@@ -12,12 +12,12 @@
 typedef struct {
   int type;
   char shortopt;
-  char *longopt;
+  const char *longopt;
   int *flag_adr;
   int flag_value;
   char **arg_adr;
   char *arg_default;
-  void (*callback)(char *arg);
+  void (*callback)(const char *opt, const char *arg, int l);
 } option_t;
 
 #define OPTION_FLAG 0
