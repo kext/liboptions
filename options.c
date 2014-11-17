@@ -12,11 +12,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define NEED_ARGUMENT_LONG  "Option '--%s' needs an argument."
-#define NEED_ARGUMENT_SHORT "Option '-%c' needs an argument."
-#define UNRECOGNISED_LONG   "Unrecognised option '--%s'."
-#define UNRECOGNISED_SHORT  "Unrecognised option '-%c'."
-#define UNEXPECTED_ARGUMENT "Option '--%s' expects no argument."
+#define NEED_ARGUMENT_LONG  "Option '--\0' needs an argument."
+#define NEED_ARGUMENT_SHORT "Option '-\0' needs an argument."
+#define UNRECOGNISED_LONG   "Unrecognised option '--\0'."
+#define UNRECOGNISED_SHORT  "Unrecognised option '-\0'."
+#define UNEXPECTED_ARGUMENT "Option '--\0' expects no argument."
+
+static int fprintfs(FILE* f, const char *format, const char *str)
+{
+  while (*format) putc(*(format++), f); format++;
+  while (*str)    putc(*(str++), f);
+  while (*format) putc(*(format++), f);
+  return 0;
+}
+
+static int fprintfc(FILE* f, const char *format, char c)
+{
+  while (*format) putc(*(format++), f); format++;
+  putc(c, f);
+  while (*format) putc(*(format++), f);
+  return 0;
+}
+
 
 static int str_equal(const char *a, const char *b)
 {
@@ -33,7 +50,7 @@ static option_t *lookup_short(option_t **o, char n)
     }
     ++o;
   }
-  fprintf(stderr, UNRECOGNISED_SHORT "\n", n);
+  fprintfc(stderr, UNRECOGNISED_SHORT "\n", n);
   exit(1);
   return 0;
 }
@@ -46,7 +63,7 @@ static option_t *lookup_long(option_t **o, char *n)
     }
     ++o;
   }
-  fprintf(stderr, UNRECOGNISED_LONG "\n", n);
+  fprintfs(stderr, UNRECOGNISED_LONG "\n", n);
   exit(1);
   return 0;
 }
@@ -75,9 +92,9 @@ static void apply_option(option_t *o, char *arg, int l)
   }
   if (!arg && HAS_PARAMETER(o) && !HAS_DEFAULT(o)) {
     if (l) {
-      fprintf(stderr, NEED_ARGUMENT_LONG "\n", o->longopt);
+      fprintfs(stderr, NEED_ARGUMENT_LONG "\n", o->longopt);
     } else {
-      fprintf(stderr, NEED_ARGUMENT_SHORT "\n", o->shortopt);
+      fprintfc(stderr, NEED_ARGUMENT_SHORT "\n", o->shortopt);
     }
     exit(1);
   }
@@ -130,7 +147,7 @@ int parse_options(int *argc, char ***argv, option_t **options)
         o = lookup_long(options, a);
         if (v || !HAS_PARAMETER(o)) {
           if (v && !HAS_PARAMETER(o)) {
-            fprintf(stderr, UNEXPECTED_ARGUMENT "\n", o->longopt);
+            fprintfs(stderr, UNEXPECTED_ARGUMENT "\n", o->longopt);
             exit(1);
           }
           apply_option(o, v, l);
